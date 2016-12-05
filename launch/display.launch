@@ -1,0 +1,24 @@
+<launch>
+	<!-- LAUNCH INTERFACE -->
+	<arg name="gui" default="true" />
+	<arg name="robot_name" default="phasespace_glove"/>
+	<arg name="use_rviz" default="true"/> 
+
+	<!-- LAUNCH IMPLEMENTATION -->
+	<param name="robot_description" command="$(find xacro)/xacro.py $(find phasespace_description)/robot/$(arg robot_name).urdf.xacro"/>
+	<!-- <param name="use_gui" value="$(arg gui)"/> -->
+
+	<node name="joint_state_publisher" pkg="joint_state_publisher" type="joint_state_publisher"/>
+
+
+	<node name="robot_state_publisher" pkg="robot_state_publisher" type="state_publisher"/>
+
+
+    		<!-- whether to use rviz or not -->
+	<node name="my_rviz" pkg="rviz" type="rviz" respawn="false" args="-d $(find phasespace_description)/launch/my_rviz.rviz" output="screen"/>
+
+
+</launch>
+
+
+    <!-- <!-- <node name="phasespace_description_node" pkg="phasespace_description" type="phasespace_description_node" /> -->
