@@ -11,14 +11,11 @@
 	<param name="use_gui" value="$(arg gui)"/>
 
 
-	<node name="robot_state_publisher" pkg="robot_state_publisher" type="state_publisher"/>
+	<node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher"/>
 
-	<node name="joint_state_publisher" pkg="joint_state_publisher" type="joint_state_publisher"/>	
+	<!-- <node name="joint_state_publisher" pkg="joint_state_publisher" type="joint_state_publisher"/>	 -->
 
-	<node name="phasespace_description_node" pkg="phasespace_description" type="phasespace_description_node">
-		    <remap from="robot_description" to="different_robot_description" />
-      		<remap from="joint_states" to="different_joint_states" />
-    </node>
+	<node name="phasespace_description_node" pkg="phasespace_description" type="phasespace_description_node" respawn="false" output="screen"/>
 
 
 

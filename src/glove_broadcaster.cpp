@@ -3,18 +3,25 @@
 
 glove_coordinates::glove_coordinates()
 {
+	joint_pub_ = n_.advertise<sensor_msgs::JointState>("joint_states", 1000);
+	finger_sub_ = n_.subscribe("/which_finger", 100, &glove_coordinates::checkFinger, this);
 
-	joint_pub_ = n_.advertise<sensor_msgs::JointState>("joint_states", 1);
+	step_ = 1;
 
-	vr_.resize(1,4);
-	vt_.resize(1,3);
+	pkg_path_ = ros::package::getPath("phasespace_description");
 
-	count_ = 0;
+	check_finger_flag_ = false;
+	load_data_flag_ = false;
 
-
-	odom_trans.header.frame_id = "world";
-    odom_trans.child_frame_id = "glied_link";
-
+	joint_state_.name.resize(7);
+	joint_state_.position.resize(7);
+	joint_state_.name[0] = "right_hand_synergy_joint";
+	joint_state_.name[1] = "glove_erste_joint_roll";
+	joint_state_.name[2] = "glove_erste_joint_pitch";
+	joint_state_.name[3] = "glove_erste_joint_yaw";
+	joint_state_.name[4] = "glove_erste_joint_x";
+	joint_state_.name[5] = "glove_erste_joint_y";
+	joint_state_.name[6] = "glove_erste_joint_z";
 }
 
 /***************************************************************************************/
@@ -22,8 +29,16 @@ glove_coordinates::glove_coordinates()
 
 glove_coordinates::~glove_coordinates()
 {
-	rotation_file_.close();
-	translation_file_.close();
+}
+
+/***************************************************************************************/
+/***************************************************************************************/
+
+void glove_coordinates::checkFinger(std_msgs::String finger)
+{
+	s_ = finger.data;
+	check_finger_flag_ = true;
+	load_data_flag_ = true;
 }
 
 /***************************************************************************************/
@@ -34,16 +49,30 @@ void glove_coordinates::openAndLoad()
 	int i=0;
 	int j=0;
 
-	std::string s, s1, s2;
+	std::string s, s1, s2, s3, s4;
+	std::string line1, line2, line3, line4;
 
-	s = "index";
+	std::vector<std::string> q_vector_string;
+	std::vector<std::string> t_vector_string;
 
-	s2 = "src/phasespace_imu_integration/measurements/" + s + "_traslation.txt";
-	s1 = "src/phasespace_imu_integration/measurements/" + s + "_rotation.txt";
+	std::vector<std::string> acc_vector_string;
 
-	rotation_file_.open(s1.c_str() );
-	translation_file_.open(s1.c_str());
+	double roll, pitch, yaw;
 
+	// s = "little";
+	
+	s1 = pkg_path_ + "/measurements/" + s_ + "_rotation.txt";
+	s2 = pkg_path_ + "/measurements/" + s_+ + "_traslation.txt";
+	s3 = pkg_path_ + "/measurements/" + s_ + "_acc.txt";
+	s4 = pkg_path_ + "/measurements/" + s_ + "_gyro.txt";
+
+	//open files
+	rotation_file_.open(s1.c_str());
+	translation_file_.open(s2.c_str());
+	acc_file_.open(s3.c_str());
+	gyro_file_.open(s4.c_str());
+
+	//check
 	if(rotation_file_.is_open()){
 		std::cout << "rotation_file_ is open" << std::endl;
 	}
@@ -59,114 +88,179 @@ void glove_coordinates::openAndLoad()
 	}
 
 
-	std::string line;
+	//take rows number
+	for (int p=0; std::getline(gyro_file_, line4); p++)
+		matrix_size_ = p;
 
-	for (i=0; std::getline(rotation_file_, line); i++)
+	matrix_size_++;
+
+
+	Qrotation_.resize(matrix_size_,4); 
+	RPY_.resize(matrix_size_,3); 
+	translation_.resize(matrix_size_,3);
+	offset_R_.resize(1,3);
+	offset_T_.resize(1,3);
+
+	acc_.resize(matrix_size_,21);
+	norm_acc_.resize(matrix_size_,7);
+
+	//load translation matrix
+	for (i=0; std::getline(translation_file_, line2); i++)
 	{
-		rotation_file_ >> m_rotation_(i,1);
-		rotation_file_ >> m_rotation_(i,2);
-		rotation_file_ >> m_rotation_(i,3);
-		rotation_file_ >> m_rotation_(i,4);
+		boost::split(t_vector_string, line2, boost::is_any_of("\t\n"));
+
+		for (j=0; j<3; j++)
+		{
+			float n = std::atof(t_vector_string[j].c_str());
+			translation_(i,j) = n;
+		}
 	}
 
-	for (j=0; std::getline(translation_file_, line); j++)
+
+		//load rotation matrix
+	for (i=0; std::getline(rotation_file_, line1); i++)
 	{
-		translation_file_ >> m_translation_(j,1);
-		translation_file_ >> m_translation_(j,2);
-		translation_file_ >> m_translation_(j,3);
+		boost::split(q_vector_string, line1, boost::is_any_of("\t\n"));
+		for (j=0; j<4; j++)
+		{
+			float n = std::atof(q_vector_string[j].c_str());
+			Qrotation_(i,j) = n;
+		}
 	}
 
-	std::cout <<"size m_rotation_\t" << m_rotation_.size() << std::endl;
-	std::cout <<"size m_translation_\t" << m_translation_.size() << std::endl;
 
+	//build matrix with roll, pitch and yaw angles
+	for (i= 0; i<matrix_size_; i++)
+	{
+		tf::Quaternion q(Qrotation_(i,1), Qrotation_(i,2), Qrotation_(i,3), Qrotation_(i,0));
+		tf::Matrix3x3 m(q);
+		m.getRPY(roll, pitch, yaw);
+		RPY_(i,0) = roll;
+		RPY_(i,1) = pitch;
+		RPY_(i,2) = yaw;
+	}
 
+	// build offset values
+	for (i=0; i<3; i++)
+	{
+		offset_T_(0,i) = translation_(0,i);
+		offset_R_(0,i) = RPY_(0,i);
+	}
+
+	// load acc
+	for (i=0; std::getline(acc_file_, line3); i++)
+	{
+		boost::split(acc_vector_string, line3, boost::is_any_of("\t\n"));
+		for (j=0; j<21; j++)
+		{
+			float n = std::atof(acc_vector_string[j].c_str());
+			acc_(i,j) = n;
+		}
+	}
+
+	//normalizing acc
+	for (i=0; i<matrix_size_; i++)
+	{
+		for (j=0; j<7; j++)
+		{
+			norm_acc_(i,j) = sqrt( pow(acc_(i,(3*j)),2) + pow(acc_(i,(3*j+1)),2) + pow(acc_(i,(3*j+2)),2) ); 
+		}
+	}
 }
 
 /***************************************************************************************/
 /***************************************************************************************/
 
-// void glove_coordinates::newCoordinates()
-// {
-// 	// transform_.setOrigin( tf::Vector3( m_translation_(count_,0), m_translation_(count_,1), m_translation_(count_,2) ) );
-//  //  	transform_.setRotation( tf::Quaternion( m_rotation_(count_,0), m_rotation_(count_,1), m_rotation_(count_,2), m_rotation_(count_,3) ) );
-
-// 	transform_.setOrigin( tf::Vector3(count_/10, count_/20, 0 ) );
-//   	transform_.setRotation( tf::Quaternion( 0, 2, 0, 1 ) );
-
-//   	count_++;
-// }
-
-/***************************************************************************************/
-/***************************************************************************************/
-
-// void glove_coordinates::sendCoordinates()
-// {
-// 	br_.sendTransform(tf::StampedTransform(transform_, ros::Time::now(), "world", "glied"));
-// }
-
-/***************************************************************************************/
-/***************************************************************************************/
 
 void glove_coordinates::updateJointStates()
 {
-	joint_state.header.stamp = ros::Time::now();
-
-	joint_state.name.resize(7);
-	joint_state.name[0] = "glove_erste_joint_roll";
-	joint_state.position[0] = 0;
-
-	joint_state.name[1] = "glove_erste_joint_pitch";
-	joint_state.position[1] = 0;
-
-	joint_state.name[2] = "glove_erste_joint_yaw";
-	joint_state.position[2] = 0;
-
-	joint_state.name[3] = "glove_erste_joint_x";
-	joint_state.position[3] = 0;
-
-	joint_state.name[4] = "glove_erste_joint_y";
-	joint_state.position[4] = 0;
-
-	joint_state.name[5] = "glove_erste_joint_z";
-	joint_state.position[5] = 0;
-
-	joint_state.name[6] = "glied";
-	joint_state.position[6] = 0;
-}
-
-
-/***************************************************************************************/
-/***************************************************************************************/
-
-void glove_coordinates::updateTransform()
-{
-    odom_trans.header.stamp = ros::Time::now();
-    odom_trans.transform.translation.x = count_/10;
-    odom_trans.transform.translation.y = count_/20;
-    odom_trans.transform.translation.z = 0;
-    odom_trans.transform.rotation = tf::createQuaternionMsgFromYaw(1/2);
+	joint_state_.position[1] = RPY_(step_,0) - offset_R_(0,0);
+	joint_state_.position[2] = RPY_(step_,1) - offset_R_(0,1);
+	joint_state_.position[3] = RPY_(step_,2) - offset_R_(0,2);
+	joint_state_.position[4] = - ( translation_(step_,0) - offset_T_(0,0) );
+	joint_state_.position[5] = - ( translation_(step_,1) - offset_T_(0,1) );
+	joint_state_.position[6] = - ( translation_(step_,2) - offset_T_(0,2) );
 }
 
 /***************************************************************************************/
 /***************************************************************************************/
 
-void glove_coordinates::sentJointStateAndTrandform()
+void glove_coordinates::sentJointState()
 {
-    joint_pub_.publish(joint_state);
-    br_.sendTransform(odom_trans);
-
-    count_++;
+	joint_state_.header.stamp = ros::Time::now();
+    joint_pub_.publish(joint_state_);
+    ros::spinOnce();
 }
 
 /***************************************************************************************/
 /***************************************************************************************/
 
+void glove_coordinates::resetJointState()
+ {
+ 	joint_state_.position[0] = 0 ;
+	joint_state_.position[1] = 0 ;
+ 	joint_state_.position[2] = 0 ;
+ 	joint_state_.position[3] = 0 ;
+ 	joint_state_.position[4] = 0 ;
+ 	joint_state_.position[5] = 0 ;
+ 	joint_state_.position[6] = 0 ;
 
-void glove_coordinates::master()
+ 	sentJointState();
+ }
+
+/***************************************************************************************/
+/***************************************************************************************/
+
+ void glove_coordinates::checkHit()
+ {
+ 	int j;
+ 	double trade = 1.2;
+ 	// 1.2 for little and index
+
+ 	for (j=0; j<5; j++)
+ 	{
+ 		if (norm_acc_(step_,j) > trade)
+ 		{
+ 			std::cout<< "finger number " << j << "hit" << std::endl;
+ 		}
+ 	}
+ 	
+ }
+
+/***************************************************************************************/
+/***************************************************************************************/
+
+void glove_coordinates::manager()
 {
-	updateJointStates();
+	if (load_data_flag_)
+	{
+		resetJointState();
 
-	updateTransform();
+		openAndLoad();
 
-	sentJointStateAndTrandform();
+		load_data_flag_ = false;
+	}
+
+	if(step_ < matrix_size_ && check_finger_flag_)
+	{
+		
+		updateJointStates();
+
+		sentJointState();
+
+		checkHit();
+
+		step_++;
+	}
+	else
+	{
+		step_ = 1;
+		check_finger_flag_ = false;
+
+		rotation_file_.close();
+		translation_file_.close();
+		acc_file_.close();
+		gyro_file_.close();
+
+	}
 }

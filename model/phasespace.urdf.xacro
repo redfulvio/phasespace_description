@@ -52,7 +52,7 @@
 			<parent link="${name}_erste_link_yaw"/>
 			<child link="${name}_erste_link_x"/>
 			<axis xyz="1 0 0"/>
-			<limit lower="${0}" upper="${1}" effort="${effort}" velocity="${velocity}"/>
+			<limit lower="${0}" upper="${2}" effort="${effort}" velocity="${velocity}"/>
 		</joint>
 		<!-- fake link -->
 		<link name="${name}_erste_link_x">
@@ -63,7 +63,7 @@
 			<parent link="${name}_erste_link_x"/>
 			<child link="${name}_erste_link_y"/>
 			<axis xyz="0 1 0"/>
-			<limit lower="${0}" upper="${1}" effort="${effort}" velocity="${velocity}"/>
+			<limit lower="${0}" upper="${2}" effort="${effort}" velocity="${velocity}"/>
 		</joint>
 		<!-- fake link -->
 		<link name="${name}_erste_link_y">
@@ -74,7 +74,7 @@
 			<parent link="${name}_erste_link_y"/>
 			<child link="${name}_erste_link_z"/>
 			<axis xyz="0 0 1"/>
-			<limit lower="${0}" upper="${1}" effort="${effort}" velocity="${velocity}"/>
+			<limit lower="${0}" upper="${2}" effort="${effort}" velocity="${velocity}"/>
 		</joint>
 		<!-- fake link -->
 		<link name="${name}_erste_link_z">
