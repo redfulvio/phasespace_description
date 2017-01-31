@@ -222,6 +222,7 @@ void glove_coordinates::resetJointState()
  		if (norm_acc_(step_,j) > trade)
  		{
  			std::cout<< "finger number " << j << "hit" << std::endl;
+ 			std::cout<< "step\t" << step_ << std::endl;
  		}
  	}
  	
