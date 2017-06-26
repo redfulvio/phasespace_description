@@ -3,7 +3,7 @@
 
 phasespace_description is a code to reproduce "primitives" acquired using the [PhaseSpace Motion Capture System](http://phasespace.com/).
 
-This package works on [Ubuntu 14.04](http://www.ubuntu.com/download/desktop).
+This package works on [Ubuntu 14.04](http://www.ubuntu.com/download/desktop) and needs the [pisa-iit-soft-hand](https://github.com/manuelbonilla/pisa-iit-soft-hand) package.
 
 
 ## Use
