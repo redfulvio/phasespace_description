@@ -59,8 +59,6 @@ void glove_coordinates::openAndLoad()
 
 	double roll, pitch, yaw;
 
-	// s = "little";
-	
 	s1 = pkg_path_ + "/measurements/" + s_ + "_rotation.txt";
 	s2 = pkg_path_ + "/measurements/" + s_+ + "_traslation.txt";
 	s3 = pkg_path_ + "/measurements/" + s_ + "_acc.txt";
@@ -77,14 +75,14 @@ void glove_coordinates::openAndLoad()
 		std::cout << "rotation_file_ is open" << std::endl;
 	}
 	else{
-		std::cout <<" error occured while opening rotation_file_" << std::endl;
+		std::cout <<"error occured while opening rotation_file_" << std::endl;
 	}
 
 	if(translation_file_.is_open()){
 		std::cout << "translation_file_ is open" << std::endl;
 	}
 	else{
-		std::cout <<" error occured while opening translation_file_" << std::endl;
+		std::cout <<"error occured while opening translation_file_" << std::endl;
 	}
 
 
@@ -213,8 +211,9 @@ void glove_coordinates::resetJointState()
 
  void glove_coordinates::checkHit()
  {
+ 	//340 - 570
  	int j;
- 	double trade = 1.2;
+ 	double trade = 1.15;
  	// 1.2 for little and index
 
  	for (j=0; j<5; j++)
@@ -249,7 +248,7 @@ void glove_coordinates::manager()
 
 		sentJointState();
 
-		checkHit();
+		// checkHit();
 
 		step_++;
 	}
